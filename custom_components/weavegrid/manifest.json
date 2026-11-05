@@ -1,6 +1,10 @@
 {
   "domain": "weavegrid",
   "name": "WeaveGrid",
+  "categories": [
+    "energy.ev_charging",
+    "energy.energy_prices"
+  ],
   "codeowners": ["@Aryeh95"],
   "config_flow": true,
   "documentation": "https://github.com/Aryeh95/weavegrid-ha",
