@@ -657,7 +657,15 @@ class WeaveGridApiClient:
     async def _async_graphql_batch(
         self, operations: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
-        """Execute a batched GraphQL POST request against /graphql."""
+        """Execute GraphQL POST request(s) against /graphql (max 5 per batch)."""
+        max_batch_size = 5
+        if len(operations) > max_batch_size:
+            combined: list[dict[str, Any]] = []
+            for idx in range(0, len(operations), max_batch_size):
+                chunk = operations[idx : idx + max_batch_size]
+                combined.extend(await self._async_graphql_batch(chunk))
+            return combined
+
         session = self._ensure_session()
         url = f"{self.base_url}/graphql"
         try:
