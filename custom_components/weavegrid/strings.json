@@ -1,0 +1,49 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to WeaveGrid",
+        "description": "Sign in with your WeaveGrid account. Leave Password blank if your account uses emailed sign-in links.",
+        "data": {
+          "email": "Email",
+          "password": "Password (optional — leave blank for Magic Link)",
+          "utility_acronym": "Utility Slug (e.g., bge, xcel, pge, pepco, comed)"
+        }
+      },
+      "totp": {
+        "title": "Two-Factor Authentication",
+        "description": "Enter the 6-digit verification code from your authenticator app.",
+        "data": {
+          "totp_code": "Verification Code"
+        }
+      },
+      "magic_link": {
+        "title": "Paste Sign-In Link",
+        "description": "WeaveGrid sent a sign-in link to {email}. Copy the button link from the email (without opening it first) and paste the URL here.",
+        "data": {
+          "magic_link": "Magic Link URL or Token"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to WeaveGrid.",
+      "invalid_auth": "Invalid email, password, or verification link.",
+      "unknown": "Unexpected error communicating with WeaveGrid."
+    },
+    "abort": {
+      "already_configured": "This WeaveGrid account is already configured.",
+      "reauth_successful": "Re-authentication was successful."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "WeaveGrid Options",
+        "data": {
+          "scan_interval": "Update interval (minutes)",
+          "include_archived": "Include archived devices/chargers"
+        }
+      }
+    }
+  }
+}
