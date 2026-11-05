@@ -14,7 +14,7 @@ Custom Home Assistant integration for **WeaveGrid** utility managed-charging por
   - Scheduled Charge Start, Next Charge Start, and Target Ready-By timestamp sensors
   - Estimated Range Added (`mi`) and Battery Level (`%`, for direct vehicle telematics)
   - Last Session Cost, Last Session Energy (`kWh`), and Last Session Duration (`h`)
-  - **Recent Charging Sessions** sensor with up to 10 recent sessions (`date`, `start`, `end`, `duration_hours`, `energy_kwh`, `cost`, `rate`, `smart`, `compliant`) in its `sessions` attribute
+  - **Recent Charging Sessions** sensor with up to 12 recent sessions (`date`, `start`, `end`, `duration_hours`, `energy_kwh`, `cost`, `rate` (average $/kWh paid), `max_rate` (highest span price), `off_peak_energy_kwh`, `off_peak_cost`, `off_peak_percent`, `smart`, `compliant`, and per-span `spans`) in its `sessions` attribute
   - 7-Day & 30-Day Charging Cost, Charging Energy, and Smart Score (`%`)
 
 ---
@@ -55,7 +55,7 @@ Custom Home Assistant integration for **WeaveGrid** utility managed-charging por
 | `sensor` | **Last Session Cost** | Cost of most recent home charging session (`USD`) |
 | `sensor` | **Last Session Energy** | Energy delivered in most recent session (`kWh`) |
 | `sensor` | **Last Session Duration** | Duration of most recent session (`h`) |
-| `sensor` | **Recent Charging Sessions** | Date of latest session + `sessions` list attribute (last 10 sessions) |
+| `sensor` | **Recent Charging Sessions** | Date of latest session + `sessions` list attribute (last 12 sessions) |
 | `sensor` | **7-Day / 30-Day Charging Cost** | Rolling 7-day and 30-day home charging cost |
 | `sensor` | **7-Day / 30-Day Charging Energy** | Rolling 7-day and 30-day home energy (`kWh`) |
 | `sensor` | **30-Day Smart Score** | WeaveGrid smart charging score (`%`) |

@@ -16,6 +16,8 @@ from .const import DEFAULT_BASE_URL, DEFAULT_UTILITY
 
 _LOGGER = logging.getLogger(__name__)
 
+MAX_RECENT_SESSIONS = 12
+
 GQL_LOGIN_DRIVER = """
 mutation LoginDriver(
   $email: String!
@@ -396,6 +398,8 @@ query userVehiclesHomeChargeHistory(
               energyDeliveredKwh
               chargeCost
               chargeCostUnit
+              offPeakEnergyDeliveredKwh
+              offPeakChargingCost
             }
           }
           chargeSpans {
@@ -498,9 +502,29 @@ class ChargeSessionSummary:
     electricity_rate: float | None = None
     is_smart: bool | None = None
     is_mc_compliant: bool | None = None
+    off_peak_energy_kwh: float | None = None
+    off_peak_cost: float | None = None
+    max_rate: float | None = None
+    spans: list[dict[str, Any]] = field(default_factory=list)
+
+    @property
+    def average_rate(self) -> float | None:
+        """Effective price paid per kWh across the whole session."""
+        if self.charge_cost is not None and self.energy_kwh:
+            return self.charge_cost / self.energy_kwh
+        return self.electricity_rate
+
+    @property
+    def off_peak_percent(self) -> float | None:
+        """Share of the session's energy delivered at the lowest (off-peak) price."""
+        if self.off_peak_energy_kwh is None or not self.energy_kwh:
+            return None
+        return max(0.0, min(100.0, self.off_peak_energy_kwh / self.energy_kwh * 100))
 
     def as_dict(self) -> dict[str, Any]:
         """Serialize session summary for Home Assistant state attributes."""
+        avg = self.average_rate
+        off_pct = self.off_peak_percent
         return {
             "date": self.usage_date,
             "start": self.start_dttm,
@@ -515,9 +539,19 @@ class ChargeSessionSummary:
             if self.charge_cost is not None
             else None,
             "currency": self.cost_unit,
-            "rate": self.electricity_rate,
+            # Average price actually paid (cost / energy); max_rate shows any peak-priced span.
+            "rate": round(avg, 5) if avg is not None else None,
+            "max_rate": self.max_rate,
+            "off_peak_energy_kwh": round(self.off_peak_energy_kwh, 2)
+            if self.off_peak_energy_kwh is not None
+            else None,
+            "off_peak_cost": round(self.off_peak_cost, 2)
+            if self.off_peak_cost is not None
+            else None,
+            "off_peak_percent": round(off_pct, 1) if off_pct is not None else None,
             "smart": self.is_smart,
             "compliant": self.is_mc_compliant,
+            "spans": self.spans,
         }
 
 
@@ -930,7 +964,8 @@ class WeaveGridApiClient:
                         "operationName": "userVehiclesHomeChargeHistory",
                         "variables": {
                             "vehicleId": vid,
-                            "chargeEventsLimit": 10,
+                            # Counts charge spans, not sessions: a session is often 2-4 spans.
+                            "chargeEventsLimit": 40,
                             "locationRelationshipTypes": ["home_primary"],
                             "includeArchivedRegistrations": True,
                         },
@@ -938,6 +973,16 @@ class WeaveGridApiClient:
                     },
                 ]
             )
+
+            for res in v_batch:
+                if isinstance(res, dict) and res.get("errors"):
+                    _LOGGER.warning(
+                        "WeaveGrid GraphQL errors for %s: %s",
+                        vid,
+                        "; ".join(
+                            str(e.get("message", e)) for e in res["errors"][:3]
+                        ),
+                    )
 
             dev_viewer = (v_batch[0].get("data") or {}).get("viewer") or {}
             dev_v = self._first_vehicle(dev_viewer)
@@ -1066,7 +1111,9 @@ class WeaveGridApiClient:
             )
             target.cost_unit = t0.get("chargeCostUnit") or "USD"
             if t0.get("smartScore") is not None:
-                target.smart_score_30d = float(t0["smartScore"])
+                # The API returns a 0-1 fraction (1.0 = the 100% shown in the WeaveGrid app).
+                score = float(t0["smartScore"])
+                target.smart_score_30d = score * 100 if 0.0 <= score <= 1.0 else score
             target.smart_score_type = t0.get("smartScoreType")
 
         dailies = ((ce.get("dailyAggregates") or {}).get("data")) or []
@@ -1103,8 +1150,18 @@ class WeaveGridApiClient:
         )
         for row in sorted_aggs:
             u_date = row.get("usageDate")
-            day_spans = spans_by_date.get(str(u_date or ""), [])
+            day_spans = sorted(
+                spans_by_date.get(str(u_date or ""), []),
+                key=lambda s: str(s.get("startDttm") or ""),
+            )
             rate = day_spans[0].get("electricityRate") if day_spans else None
+            span_rates = [
+                float(s["electricityRate"])
+                for s in day_spans
+                if s.get("electricityRate") is not None
+            ]
+            off_kwh = row.get("offPeakEnergyDeliveredKwh")
+            off_cost = row.get("offPeakChargingCost")
             is_smart = (
                 all(bool(s.get("isSmart")) for s in day_spans)
                 if day_spans
@@ -1133,10 +1190,26 @@ class WeaveGridApiClient:
                     electricity_rate=float(rate) if rate is not None else None,
                     is_smart=is_smart,
                     is_mc_compliant=is_compliant,
+                    off_peak_energy_kwh=float(off_kwh) if off_kwh is not None else None,
+                    off_peak_cost=float(off_cost) if off_cost is not None else None,
+                    max_rate=max(span_rates) if span_rates else None,
+                    spans=[
+                        {
+                            "start": s.get("startDttm"),
+                            "end": s.get("endDttm"),
+                            "rate": float(s["electricityRate"])
+                            if s.get("electricityRate") is not None
+                            else None,
+                            "smart": s.get("isSmart"),
+                            "compliant": s.get("isMcCompliant"),
+                        }
+                        for s in day_spans
+                    ],
                 )
             )
 
-        target.recent_sessions = sessions
+        # Keep the attribute payload under Home Assistant's 16 KB recorder limit.
+        target.recent_sessions = sessions[:MAX_RECENT_SESSIONS]
 
     async def async_charge_now(self, vehicle_id: str) -> dict[str, Any]:
         """Trigger immediate charging override ('Charge now') for a vehicle/EVSE."""
