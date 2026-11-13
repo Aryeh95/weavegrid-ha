@@ -1241,28 +1241,50 @@ class WeaveGridApiClient:
         enabled: bool,
         current_mc_settings: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Enable or disable Peak Avoidance while preserving existing schedule settings."""
+        """Enable or disable Peak Avoidance while preserving existing schedule settings.
+
+        Only fields that were actually read back from WeaveGrid are sent, so the
+        user's ready-by times, solar hours and low-SoC protection are never
+        replaced with defaults. Raises WeaveGridError if the current settings
+        were not read.
+        """
         mc = current_mc_settings or {}
-        raw_times = mc.get("chargeByTimes") or {}
-        days = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-        charge_by_times = {
-            day: raw_times.get(day) or "07:00" for day in days
+        if not mc or "enablePeakAvoidance" not in mc:
+            raise WeaveGridError(
+                "Current managed charging settings have not been read from "
+                "WeaveGrid; refusing to update Peak Avoidance so the existing "
+                "charging schedule is not overwritten"
+            )
+
+        variables: dict[str, Any] = {
+            "vehicleId": str(vehicle_id),
+            "enablePeakAvoidance": bool(enabled),
         }
-        raw_solar = mc.get("solarHours") or {}
-        solar_hours: dict[str, Any] = {}
-        if raw_solar.get("startTimeLocal") and raw_solar.get("endTimeLocal"):
-            solar_hours = {
+
+        raw_times = mc.get("chargeByTimes")
+        if isinstance(raw_times, dict):
+            charge_by_times = {
+                day: value
+                for day in ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+                if (value := raw_times.get(day)) is not None
+            }
+            if charge_by_times:
+                variables["chargeByTimes"] = charge_by_times
+
+        if mc.get("enableLowSocProtection") is not None:
+            variables["enableLowSocProtection"] = bool(mc["enableLowSocProtection"])
+
+        raw_solar = mc.get("solarHours")
+        if (
+            isinstance(raw_solar, dict)
+            and raw_solar.get("startTimeLocal")
+            and raw_solar.get("endTimeLocal")
+        ):
+            variables["solarHours"] = {
                 "startTimeLocal": raw_solar["startTimeLocal"],
                 "endTimeLocal": raw_solar["endTimeLocal"],
             }
 
-        variables: dict[str, Any] = {
-            "vehicleId": str(vehicle_id),
-            "chargeByTimes": charge_by_times,
-            "enablePeakAvoidance": bool(enabled),
-            "enableLowSocProtection": mc.get("enableLowSocProtection"),
-            "solarHours": solar_hours,
-        }
         results = await self._async_graphql_batch(
             [
                 {

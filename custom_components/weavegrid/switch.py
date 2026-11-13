@@ -43,6 +43,15 @@ class WeaveGridPeakAvoidanceSwitch(WeaveGridEntity, SwitchEntity):
         super().__init__(coordinator, vehicle_id, "peak_avoidance")
 
     @property
+    def available(self) -> bool:
+        """Only available when the current managed charging settings were read.
+
+        Writing without them would overwrite the user's charging schedule.
+        """
+        veh = self.vehicle
+        return super().available and veh is not None and bool(veh.mc_settings)
+
+    @property
     def is_on(self) -> bool | None:
         veh = self.vehicle
         if veh is None or not veh.mc_settings:

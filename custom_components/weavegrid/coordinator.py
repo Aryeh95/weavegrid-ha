@@ -154,6 +154,14 @@ class WeaveGridCoordinator(DataUpdateCoordinator[WeaveGridAccountData]):
         """Update Peak Avoidance setting and refresh coordinator."""
         veh = (self.data.vehicles.get(vehicle_id)) if self.data else None
         current_mc = veh.mc_settings if veh else None
+        if not current_mc:
+            # Never write without the current settings: WeaveGrid's mutation
+            # would otherwise replace the user's ready-by times and solar hours.
+            raise HomeAssistantError(
+                "Cannot update Peak Avoidance: the current managed charging "
+                "settings could not be read from WeaveGrid. Try again after "
+                "the next successful refresh."
+            )
         try:
             res = await self.client.async_set_peak_avoidance(
                 vehicle_id, enabled, current_mc

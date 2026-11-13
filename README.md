@@ -8,7 +8,7 @@ Custom Home Assistant integration for **WeaveGrid** utility managed-charging por
 - **Per-Charger / Per-Vehicle Devices**: Automatically discovers active EVs and EVSEs (e.g., Emporia, Wallbox, ChargePoint, Tesla, Rivian, etc.), with an option to show/hide archived registrations.
 - **Controls**:
   - **`Charge Now` Button**: Immediately overrides smart scheduling (`/api/settings/override`) when you need to charge right away.
-  - **`Peak Avoidance` Switch**: Toggles Peak Avoidance via GraphQL while preserving your weekday/weekend ready-by times and solar hours.
+  - **`Peak Avoidance` Switch**: Toggles Peak Avoidance via GraphQL while preserving your weekday/weekend ready-by times, solar hours, and low-battery protection. It only sends settings it has read back from WeaveGrid, and it is unavailable (and refuses to write) whenever the current settings couldn't be read, so your schedule is never overwritten with defaults.
 - **Rich Sensors & Session History**:
   - Plugged-in, Charging, At-Home, and Smart Charging binary sensors
   - Scheduled Charge Start, Next Charge Start, and Target Ready-By timestamp sensors
@@ -21,13 +21,13 @@ Custom Home Assistant integration for **WeaveGrid** utility managed-charging por
 
 ## Installation
 
-### Option A: Home Assistant Marketplace (Custom Repository)
+### Option A: HACS (recommended)
 
-1. Push this `weavegrid-ha` folder to a **public** GitHub repository and create an initial GitHub Release (e.g., tag `v0.1.0`).
-2. In Home Assistant, go to **Settings -> Marketplace**.
-3. In the upper-right corner, select **Add from link**.
-4. Enter your GitHub repository (`https://github.com/<owner>/<repo>` or `<owner>/<repo>`) and select **Add** (choose **Integration** if prompted).
-5. Open **WeaveGrid** from your Marketplace list and select **Install** — Home Assistant can load it immediately and open the setup dialog (or add it anytime under **Settings -> Devices & services -> Add Integration -> WeaveGrid**).
+1. Open **HACS** in Home Assistant and search for **WeaveGrid**.
+2. If it doesn't show up yet, add this repository as a custom repository: open the **⋮** menu in the upper-right corner, select **Custom repositories**, enter `https://github.com/Aryeh95/weavegrid-ha`, choose **Integration** as the type, and select **Add**.
+3. Open **WeaveGrid** and select **Download**.
+4. **Restart Home Assistant**.
+5. Go to **Settings -> Devices & Services -> Add Integration -> WeaveGrid**.
 
 ### Option B: Manual Copy
 
